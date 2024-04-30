@@ -39,8 +39,8 @@ std::string readEntryASCII(std::ifstream* imgFile){
 PPMImage::PPMImage(int length, int width): length(length), width(width){
     // Allocate array for image data
     imageData = new Pixel*[length];
-    for(int i =0; i < width; i++){
-        imageData[i] = new Pixel;
+    for(int i =0; i < length; i++){
+        imageData[i] = new Pixel[width];
     }
 }
 
