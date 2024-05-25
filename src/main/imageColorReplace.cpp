@@ -38,8 +38,15 @@ bool replaceColor(PPMImage* replaceIn, Pixel colorToChange, Pixel newColor, floa
             inVBO[offset + 1] = static_cast< GLfloat >(replaceIn->imageData[i][j].g);
             inVBO[offset + 2] = static_cast< GLfloat >(replaceIn->imageData[i][j].b);
             inVBO[offset + 3] = 1;
+
+            // Fill out VBO with dummy data
+            inVBO[offset] = 0.0;
+            inVBO[offset + 1] = 0.0;
+            inVBO[offset + 2] = 0.0;
+            inVBO[offset + 3] = 0.0;
         }
     }
+ 
 
     // Create the compute program, to which the compute shader will be assigned
     GLuint gComputeProgram = glCreateProgram();
@@ -114,13 +121,13 @@ bool replaceColor(PPMImage* replaceIn, Pixel colorToChange, Pixel newColor, floa
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, bufferNames[0]);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, indexInBufferBinding, bufferNames[0]);
     // Load data
-    glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(inVBO), inVBO, GL_STATIC_READ);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(inVBO), inVBO, GL_DYNAMIC_READ);
 
     //Bind output buffer
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, bufferNames[1]);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, indexOutBufferBinding, bufferNames[1]);
     // Fill Buffer
-    glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(outVBO), nullptr, GL_DYNAMIC_READ);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(outVBO), outVBO, GL_DYNAMIC_READ);
 
     // Dispatch compute jobs
     glDispatchCompute(replaceIn->length, replaceIn->width, 1);
@@ -142,7 +149,7 @@ bool replaceColor(PPMImage* replaceIn, Pixel colorToChange, Pixel newColor, floa
             memcpy(&tmp, outData + offset + 1, sizeof(float));
             replaceIn->imageData[i][j].g = static_cast<int>(tmp);
 
-            memcpy(&tmp, outData + offset + 1, sizeof(float));
+            memcpy(&tmp, outData + offset + 2, sizeof(float));
             replaceIn->imageData[i][j].b = static_cast<int>(tmp);
             
         }

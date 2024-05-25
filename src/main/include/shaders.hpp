@@ -10,14 +10,6 @@ uniform float changeDist;
 
 uniform vec2 arraySize;
 
-// Output buffer
-layout(std140, binding = 1) buffer destBuffer
-{
-
-      vec4 data[];
-
-} outBuffer;
-
 // Input buffer
 layout(std140, binding = 0) buffer srcBuffer
 {
@@ -26,7 +18,13 @@ layout(std140, binding = 0) buffer srcBuffer
 
 } srcBuffer;
 
+// Output buffer
+layout(std140, binding = 1) buffer destBuffer
+{
 
+      float data[];
+
+} outBuffer;
 
 // Work groups
 layout (local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
@@ -38,7 +36,7 @@ void main()
     ivec2 arrPos = ivec2(gl_GlobalInvocationID.xy);
 
     // Calculate offset for 1D array
-    uint offset = (arrPos.y * arraySize.x) + arrPos.x;
+    uint offset = (arrPos.y * arraySize.y) + arrPos.x;
 
     // Get input pixel
     vec3 thisPix = srcBuffer.data[offset].xyz;
@@ -58,6 +56,10 @@ void main()
     }
 
     // Write to output buffer
-    outBuffer.data[offset] = vec4(outPix.xyz, 1);
+    atomicExchange(outBuffer.data[offset], outPix.x)
+    atomicExchange(outBuffer.data[offset + 1], outPix.y)
+    atomicExchange(outBuffer.data[offset + 2], outPix.z)
+    atomicExchange(outBuffer.data[offset + 3], 1)
 
+    //outBuffer.data[offset] = vec4(outPix.xyz, 1);
 })V0G0N";

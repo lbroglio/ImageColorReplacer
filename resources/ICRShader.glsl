@@ -18,7 +18,7 @@ layout(std140, binding = 0) buffer srcBuffer
 layout(std140, binding = 1) buffer destBuffer
 {
 
-      vec4 data[];
+      float data[];
 
 } outBuffer;
 
@@ -52,5 +52,10 @@ void main()
     }
 
     // Write to output buffer
-    outBuffer.data[offset] = vec4(outPix.xyz, 1);
-    }
+    atomicExchange(outBuffer.data[offset], outPix.x)
+    atomicExchange(outBuffer.data[offset + 1], outPix.y)
+    atomicExchange(outBuffer.data[offset + 2], outPix.z)
+    atomicExchange(outBuffer.data[offset + 3], 1)
+
+    //outBuffer.data[offset] = vec4(outPix.xyz, 1);
+}
