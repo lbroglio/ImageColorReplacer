@@ -3,8 +3,8 @@
 #include <GLES3/gl31.h>
 #include <GL/glext.h>
 
-#include "./include/shaders.hpp"
-#include "../file-io/include/ppmIO.hpp"
+#include "./shaders.hpp"
+#include "../file-io/ppmIO.hpp"
 
 
 

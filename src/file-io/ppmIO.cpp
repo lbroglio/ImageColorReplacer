@@ -1,4 +1,4 @@
-#include"./include/ppmIO.hpp"
+#include"ppmIO.hpp"
 
 /**
  * @brief Gets the next entry it can find in the given file stream.
