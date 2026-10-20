@@ -1,14 +1,15 @@
-imageColorReplacer: bin/ppmIO.o bin/main.o
-	g++ -ggdb -o bin/imageColorReplacer bin/ppmIO.o bin/main.o -lGL
+BUILD_DIR ?= build
 
-bin/ppmIO.o: src/file-io/ppmIO.cpp bin
-	g++ -c -ggdb -o bin/ppmIO.o src/file-io/ppmIO.cpp 
+.PHONY: all configure build clean
 
-bin/main.o: src/main/imageColorReplace.cpp bin
-	g++ -c -ggdb -o bin/main.o src/main/imageColorReplace.cpp 
+# Default target runs when you just type 'make'
+all: build
 
-bin:
-	mkdir bin
+configure:
+	cmake -S . -B $(BUILD_DIR) 
+
+build: configure
+	cmake --build $(BUILD_DIR)
 
 clean:
-	rm bin/*
+	rm -rf $(BUILD_DIR)
