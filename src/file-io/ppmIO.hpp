@@ -13,17 +13,17 @@ class Pixel{
          * @brief Red component of this pixel
          * 
          */
-        int r;
+        std::uint32_t r;
         /**
          * @brief Green component of this pixel
          * 
          */
-        int g;
+        std::uint32_t g;
         /**
          * @brief Blue component of this pixel
          * 
          */
-        int b;
+        std::uint32_t b;
 };
 
 
@@ -34,9 +34,9 @@ class Pixel{
 class PPMImage{
     public:
         /**
-         * @brief Store the data that makes up the image as a 2D array of pixels
+         * @brief Store the data that makes up the image as a 2D array
          */
-        Pixel** imageData;
+        std::vector<std::vector<Pixel>> imageData;
         /**
          * @brief The number of pixels long this image is
          * 
@@ -54,11 +54,6 @@ class PPMImage{
          * @param width The number of pixels wide this image should be 
          */
         PPMImage(int length, int width);
-        /**
-         * @brief Destroy the PPMImage object and free its array.
-         * 
-         */
-        ~PPMImage();
 };
 
 /**
@@ -79,6 +74,6 @@ PPMImage readInPPM(std::string filePath);
  * @param imgHeight The height of the image to output in pixels
  * @return The fiel stream being printed to after the image has been written
  */
-void PPMOut(std::ofstream* file, Pixel** outputFrom, int imgLength, int imgWidth);
+void PPMOut(std::ofstream* file, std::vector<std::vector<Pixel>> outputFrom, int imgLength, int imgWidth);
 
 

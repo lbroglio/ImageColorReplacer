@@ -38,20 +38,9 @@ std::string readEntryASCII(std::ifstream* imgFile){
 
 PPMImage::PPMImage(int length, int width): length(length), width(width){
     // Allocate array for image data
-    imageData = new Pixel*[length];
-    for(int i =0; i < length; i++){
-        imageData[i] = new Pixel[width];
-    }
+    imageData = std::vector<std::vector<Pixel>>(length, std::vector<Pixel>(width));
 }
 
-PPMImage::~PPMImage(){
-    // Free the array storing this pixels data
-    for(int i =0; i < width; i++){
-        delete imageData[i];
-    }
-
-    delete[] imageData;
-}
 
 /**
  * @brief Reads the three color values that make up a pixel from the given file. 
@@ -65,9 +54,13 @@ PPMImage::~PPMImage(){
 Pixel readPixel(std::ifstream* imgFile){
     Pixel toReturn;
 
-    toReturn.r = imgFile->get();
-    toReturn.g = imgFile->get();
-    toReturn.b = imgFile->get();;
+    int redVal = imgFile->get();
+    int greenVal = imgFile->get();
+    int blueVal = imgFile->get();
+
+    toReturn.r = static_cast<std::uint32_t>(redVal);
+    toReturn.g = static_cast<std::uint32_t>(greenVal);
+    toReturn.b = static_cast<std::uint32_t>(blueVal);
 
     return toReturn;
 }
@@ -133,7 +126,7 @@ PPMImage readInPPM(std::string filePath){
     return readInImg;
 }
 
-void PPMOut(std::ofstream* file, Pixel** outputFrom, int imgLength, int imgWidth){
+void PPMOut(std::ofstream* file, std::vector<std::vector<Pixel>> outputFrom, int imgLength, int imgWidth){
     //Output the header
     *file << "P6\n";
     *file << imgLength  << ' ' << imgWidth << '\n';

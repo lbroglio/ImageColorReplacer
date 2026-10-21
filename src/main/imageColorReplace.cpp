@@ -1,8 +1,9 @@
-#include<cstring>
-#include <webgpu.hpp> 
+#include <cstring>
+#include <wgpu.h>
 
 #include "./shaders.hpp"
 #include "../file-io/ppmIO.hpp"
+#include "../terminal-io/errors.hpp"
 
 
 
@@ -22,6 +23,18 @@
  * @return false The operation failed for some reason (related to the GPU)
  */
 bool replaceColor(PPMImage* replaceIn, Pixel colorToChange, Pixel newColor, float distForChange){
+    // TODO - Break out creation into more functions if needed 
+    WGPUInstanceDescriptor desc = {
+        .nextInChain = NULL
+    };
+
+    // TODO - Release
+    WGPUInstance instance = wgpuCreateInstance(&desc);
+
+    if (!instance) {
+        fatal_error("Failed to create WebGPU instance");
+    }
+
     return true;
 }
 
@@ -30,7 +43,7 @@ int main(int argc, char* argv[]){
 
     // TODO -- Add error handling for args
     // Parse arguments
-    // TODO -- Add python script for taking in and outputting pngs by converting ppms
+    // TODO -- IO with PNGs converted to/or from PPMs
     std::string filePath = argv[1];
     std::string changeColorStr = argv[2];
     std::string newColorStr = argv[3];
@@ -41,6 +54,7 @@ int main(int argc, char* argv[]){
     const char* changeColorNums[3];
     const char* newColorNums[3];
 
+    //TODO - Break out into functions in terminal-io
     int firstComma = changeColorStr.find_first_of(',');
     int secondComma =  changeColorStr.find_last_of(',');
     changeColorNums[0] = changeColorStr.substr(0, firstComma).c_str();
