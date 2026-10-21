@@ -1,3 +1,5 @@
+#pragma once
+
 #include <iostream>
 
 #define RED     "\033[31m"

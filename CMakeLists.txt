@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.14)
 
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 26)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
@@ -20,6 +20,7 @@ add_executable(ImageColorReplacer
     src/main/imageColorReplace.cpp
     src/file-io/ppmIO.cpp
     src/terminal-io/errors.cpp
+    src/utils/graphicsUtils.cpp
 )
 target_compile_features(ImageColorReplacer PRIVATE cxx_std_20)
 target_include_directories(ImageColorReplacer PRIVATE

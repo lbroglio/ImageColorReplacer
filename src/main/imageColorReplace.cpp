@@ -1,7 +1,6 @@
 #include <cstring>
 #include <wgpu.h>
 
-#include "./shaders.hpp"
 #include "../file-io/ppmIO.hpp"
 #include "../terminal-io/errors.hpp"
 
@@ -24,9 +23,10 @@
  */
 bool replaceColor(PPMImage* replaceIn, Pixel colorToChange, Pixel newColor, float distForChange){
     // TODO - Break out creation into more functions if needed 
+    
     WGPUInstanceDescriptor desc = {
-        .nextInChain = NULL
-    };
+        .nextInChain = NULL 
+       };
 
     // TODO - Release
     WGPUInstance instance = wgpuCreateInstance(&desc);
