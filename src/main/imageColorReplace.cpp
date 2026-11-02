@@ -1,14 +1,45 @@
-#include <cstring>
 #include <wgpu.h>
+#include <string>
+#include <iostream>
+#include <thread>
+#include <chrono>
 
 #include "../file-io/ppmIO.hpp"
 #include "../terminal-io/errors.hpp"
+#include "../utils/graphicsUtils.hpp"
 
 
 
 // Globals 
 
-// Log for openGL errors
+// TODO Log for openGL errors
+
+// Embedded shader code
+const char shader_code[] = {
+    #embed "../../resources/ICRShader.wgsl"
+};
+
+struct AdapterRequestState {
+    WGPUAdapter adapter = nullptr;
+    bool complete = false;
+};
+
+struct DeviceRequestState {
+    WGPUDevice device = nullptr;
+    bool complete = false;
+};
+
+static void on_adapter_ready(WGPUAdapter adapter, void* userdata) {
+    auto* state = static_cast<AdapterRequestState*>(userdata);
+    state->adapter = adapter;
+    state->complete = true;
+}
+
+static void on_device_ready(WGPUDevice device, void* userdata) {
+    auto* state = static_cast<DeviceRequestState*>(userdata);
+    state->device = device;
+    state->complete = true;
+}
 
 
 /**
@@ -23,17 +54,51 @@
  */
 bool replaceColor(PPMImage* replaceIn, Pixel colorToChange, Pixel newColor, float distForChange){
     // TODO - Break out creation into more functions if needed 
+
+    // Load the shader code from file
     
-    WGPUInstanceDescriptor desc = {
-        .nextInChain = NULL 
-       };
-
-    // TODO - Release
-    WGPUInstance instance = wgpuCreateInstance(&desc);
-
+    // Initialize WebGPU objects
+    WGPUInstance instance = init_instance();
     if (!instance) {
-        fatal_error("Failed to create WebGPU instance");
+        return false;
     }
+
+    AdapterRequestState adapter_state;
+    request_adapter(instance, on_adapter_ready, &adapter_state);
+    while (!adapter_state.complete) {
+        wgpuInstanceProcessEvents(instance);
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+
+    WGPUAdapter adapter = adapter_state.adapter;
+    if (!adapter) {
+        return false;
+    }
+
+    DeviceRequestState device_state;
+    request_device(adapter, on_device_ready, &device_state);
+    while (!device_state.complete) {
+        wgpuInstanceProcessEvents(instance);
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+
+    WGPUDevice device = device_state.device;
+    if (!device) {
+        return false;
+    }
+    WGPUQueue queue = init_queue(device);
+    WGPUShaderModule shader_module = init_shader_module(device, shader_code, "ColorReplaceShader");
+    WGPUComputePipeline pipeline = init_compute_pipeline(device, shader_module, "main", "ColorReplacePipeline");
+    WGPUCommandEncoder encoder = init_command_encoder(device);
+    WGPUComputePassEncoder pass_encoder = init_compute_pass_encoder(encoder);
+
+    // If any item in the above initialization failed, return false
+    if (!queue || !shader_module || !pipeline || !encoder || !pass_encoder) {
+        return false;
+    }
+
+    
+
 
     return true;
 }

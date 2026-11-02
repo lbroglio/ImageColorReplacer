@@ -3,29 +3,34 @@
 
 #include "graphicsUtils.hpp"
 
+
+struct AdapterRequestContext {
+    AdapterReadyCallback callback;
+    void* userdata;
+};
+
+struct DeviceRequestContext {
+    DeviceReadyCallback callback;
+    void* userdata;
+};
+
 static void on_adapter_request(WGPURequestAdapterStatus status, WGPUAdapter adapter, WGPUStringView message, void* userdata1, void* userdata2) {
-    // Cast the user data to the appropriate callback type.
-    auto callback = static_cast<AdapterReadyCallback>(userdata1);
+    auto* context = static_cast<AdapterRequestContext*>(userdata1);
 
-    if (status != WGPURequestAdapterStatus_Success) {
-        callback(nullptr, userdata2);
-        return;
-    }
-
-    callback(adapter, userdata2);
+    context->callback(
+        status == WGPURequestAdapterStatus_Success ? adapter : nullptr,
+        context->userdata
+    );
+    delete context;
 }
 
 static void on_device_request(WGPURequestDeviceStatus status, WGPUDevice device, WGPUStringView message, void *userdata, void *userdata2) {
-    *(WGPUDevice*)userdata = device;
-}
-static void on_adapter_ready(WGPUAdapter adapter, void* userdata) {
-    if (adapter == nullptr) {
-        // Handle failure.
-        return;
-    }
-
-    // The adapter is valid here.
-    // Request the device here or notify the application.
+    auto* context = static_cast<DeviceRequestContext*>(userdata);
+    context->callback(
+        status == WGPURequestDeviceStatus_Success ? device : nullptr,
+        context->userdata
+    );
+    delete context;
 }
 
 WGPUInstance init_instance(){
@@ -43,12 +48,13 @@ WGPUInstance init_instance(){
 }
 
 void request_adapter(WGPUInstance instance,AdapterReadyCallback callback,void* userdata) {
+    auto* context = new AdapterRequestContext{callback, userdata};
     WGPURequestAdapterCallbackInfo callback_info = {
         .nextInChain = nullptr,
         .mode = WGPUCallbackMode_AllowProcessEvents,
         .callback = on_adapter_request,
-        .userdata1 = reinterpret_cast<void*>(callback),
-        .userdata2 = userdata
+        .userdata1 = context,
+        .userdata2 = nullptr
     };
 
     wgpuInstanceRequestAdapter(
@@ -59,13 +65,13 @@ void request_adapter(WGPUInstance instance,AdapterReadyCallback callback,void* u
 }
 
 
-WGPUDevice init_device(WGPUAdapter adapter) {
-    WGPUDevice device = NULL;
+void request_device(WGPUAdapter adapter, DeviceReadyCallback callback, void* userdata) {
+    auto* context = new DeviceRequestContext{callback, userdata};
     wgpuAdapterRequestDevice(adapter, NULL, (WGPURequestDeviceCallbackInfo){
-        .callback = on_device_request, .userdata1 = &device
+        .mode = WGPUCallbackMode_AllowProcessEvents,
+        .callback = on_device_request,
+        .userdata1 = context
     });
-
-    return device;
 }
 
 WGPUQueue init_queue(WGPUDevice device) {
@@ -105,3 +111,53 @@ WGPUShaderModule init_shader_module(WGPUDevice device, const char* shader_code, 
 }
 
 
+WGPUComputePipeline init_compute_pipeline(WGPUDevice device, WGPUShaderModule shader_module, std::string entry_point,
+    std::string pipeline_label) {
+    WGPUComputePipelineDescriptor pipeline_desc = {
+        .nextInChain = NULL,
+        .label = pipeline_label.c_str(),
+        .layout = NULL,
+        .compute = {
+            .module = shader_module,
+            .entryPoint = entry_point.c_str()
+        }
+    };
+
+    WGPUComputePipeline pipeline = wgpuDeviceCreateComputePipeline(device, &pipeline_desc);
+
+    if (!pipeline) {
+        return NULL;
+    }
+
+    return pipeline;
+}
+
+WGPUCommandEncoder init_command_encoder(WGPUDevice device) {
+    WGPUCommandEncoderDescriptor encoder_desc = {
+        .nextInChain = NULL,
+        .label = "Compute Encoder"
+    };
+
+    WGPUCommandEncoder encoder = wgpuDeviceCreateCommandEncoder(device, &encoder_desc);
+
+    if (!encoder) {
+        return NULL;
+    }
+
+    return encoder;
+}
+
+WGPUComputePassEncoder init_compute_pass_encoder(WGPUCommandEncoder encoder) {
+    WGPUComputePassDescriptor pass_desc = {
+        .nextInChain = NULL,
+        .label = "Compute Pass"
+    };
+
+    WGPUComputePassEncoder pass_encoder = wgpuCommandEncoderBeginComputePass(encoder, &pass_desc);
+
+    if (!pass_encoder) {
+        return NULL;
+    }
+
+    return pass_encoder;
+}
