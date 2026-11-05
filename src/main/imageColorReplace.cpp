@@ -1,12 +1,16 @@
-#include <wgpu.h>
 #include <string>
 #include <iostream>
 #include <thread>
 #include <chrono>
+#include <cstring>
+
+#include <wgpu.h>
+
 
 #include "../file-io/ppmIO.hpp"
 #include "../terminal-io/errors.hpp"
-#include "../utils/graphicsUtils.hpp"
+#include "../graphics/graphicsUtils.hpp"
+#include "../graphics/graphics.hpp"
 
 
 
@@ -19,27 +23,37 @@ const char shader_code[] = {
     #embed "../../resources/ICRShader.wgsl"
 };
 
-struct AdapterRequestState {
-    WGPUAdapter adapter = nullptr;
-    bool complete = false;
+struct MapResult {
+    bool done;
+    bool success;
 };
 
-struct DeviceRequestState {
-    WGPUDevice device = nullptr;
-    bool complete = false;
-};
+// TODO - Maybe move this elsewhere
+static void on_buffer_mapped(
+    WGPUMapAsyncStatus status,
+    WGPUStringView message,
+    void* userdata1,
+    void* userdata2
+) {
+    MapResult* result = static_cast<MapResult*>(userdata1);
 
-static void on_adapter_ready(WGPUAdapter adapter, void* userdata) {
-    auto* state = static_cast<AdapterRequestState*>(userdata);
-    state->adapter = adapter;
-    state->complete = true;
+    result->success = (status == WGPUMapAsyncStatus_Success);
+    result->done = true;
 }
 
-static void on_device_ready(WGPUDevice device, void* userdata) {
-    auto* state = static_cast<DeviceRequestState*>(userdata);
-    state->device = device;
-    state->complete = true;
+
+static void on_gpu_work_done(WGPUQueueWorkDoneStatus status, WGPUStringView message, void *userdata1, void *userdata2) {
+    bool *done = (bool *)userdata1;
+
+    if (status != WGPUQueueWorkDoneStatus_Success) {
+        printf("GPU work failed: %.*s\n",
+            (int)message.length,
+            message.data);
+    }
+
+    *done = true;
 }
+
 
 
 /**
@@ -53,52 +67,137 @@ static void on_device_ready(WGPUDevice device, void* userdata) {
  * @return false The operation failed for some reason (related to the GPU)
  */
 bool replaceColor(PPMImage* replaceIn, Pixel colorToChange, Pixel newColor, float distForChange){
-    // TODO - Break out creation into more functions if needed 
-
-    // Load the shader code from file
+    // TODO - Maybe switch to reading this in as a 1D array instead of a 2D array to avoid flattening it here
+    // Flatten the 2D image data into a 1D array for GPU processing
+    std::vector<Pixel> flatImageData;
+    for (const auto& row : replaceIn->imageData) {
+        flatImageData.insert(flatImageData.end(), row.begin(), row.end());
+    }
     
-    // Initialize WebGPU objects
-    WGPUInstance instance = init_instance();
-    if (!instance) {
-        return false;
-    }
-
-    AdapterRequestState adapter_state;
-    request_adapter(instance, on_adapter_ready, &adapter_state);
-    while (!adapter_state.complete) {
-        wgpuInstanceProcessEvents(instance);
-        std::this_thread::sleep_for(std::chrono::milliseconds(1));
-    }
-
-    WGPUAdapter adapter = adapter_state.adapter;
-    if (!adapter) {
-        return false;
-    }
-
-    DeviceRequestState device_state;
-    request_device(adapter, on_device_ready, &device_state);
-    while (!device_state.complete) {
-        wgpuInstanceProcessEvents(instance);
-        std::this_thread::sleep_for(std::chrono::milliseconds(1));
-    }
-
-    WGPUDevice device = device_state.device;
-    if (!device) {
-        return false;
-    }
-    WGPUQueue queue = init_queue(device);
-    WGPUShaderModule shader_module = init_shader_module(device, shader_code, "ColorReplaceShader");
-    WGPUComputePipeline pipeline = init_compute_pipeline(device, shader_module, "main", "ColorReplacePipeline");
-    WGPUCommandEncoder encoder = init_command_encoder(device);
-    WGPUComputePassEncoder pass_encoder = init_compute_pass_encoder(encoder);
-
-    // If any item in the above initialization failed, return false
-    if (!queue || !shader_module || !pipeline || !encoder || !pass_encoder) {
-        return false;
-    }
-
     
+    ColorReplaceCreateInfo info;
+    info.image_details = {
+        .length = static_cast<uint32_t>(replaceIn->length),
+        .width = static_cast<uint32_t>(replaceIn->width)
+    };
+    info.replace_color = colorToChange;
+    info.new_color = newColor;
+    info.image = std::span(flatImageData);
+    info.shader_code = std::string_view(shader_code, sizeof(shader_code));
 
+    ColorReplacePipelineResources pipeline_resources;
+    if (!pipeline_resources.create(info)) {
+        return false;
+    }
+
+
+
+    WGPUCommandBufferDescriptor encoder_desc = {
+        .nextInChain = NULL,
+        .label = "Buffer Copy Encoder"
+    };
+
+    // TODO - Ensure this is freed after use
+    WGPUCommandBuffer commandBuffer =
+        wgpuCommandEncoderFinish(
+            pipeline_resources.encoder,
+            &encoder_desc
+        );
+
+    wgpuQueueSubmit(pipeline_resources.queue, 1, &commandBuffer);
+    
+    // Setup callback 
+    bool done = false;
+    WGPUQueueWorkDoneCallbackInfo callbackInfo = {
+        .mode = WGPUCallbackMode_AllowProcessEvents,
+        .callback = on_gpu_work_done,
+        .userdata1 = &done,
+        .userdata2 = NULL
+    };
+
+    wgpuQueueOnSubmittedWorkDone(pipeline_resources.queue, callbackInfo);
+
+    while (!done) {
+        wgpuInstanceProcessEvents(pipeline_resources.instance);
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+
+        // TODO - Add timeout to avoid infinite loop
+    }
+
+    // TODO - Ensure this is freed after use
+    WGPUBuffer staging_buffer = init_storage_buffer(
+        pipeline_resources.device,
+        sizeof(Pixel) * replaceIn->length * replaceIn->width,
+        "StagingBuffer"
+    );
+
+    size_t buffer_size = sizeof(Pixel) * replaceIn->length * replaceIn->width;
+
+    // Copy the results from the GPU back to the staging buffer
+    wgpuCommandEncoderCopyBufferToBuffer(
+        pipeline_resources.encoder,
+        pipeline_resources.image_buffer,
+        0,
+        staging_buffer,
+        0,
+        buffer_size
+    );
+
+    // TODO - Ensure this is freed after use
+    WGPUCommandBuffer commands = wgpuCommandEncoderFinish(pipeline_resources.encoder, NULL);
+
+    wgpuQueueSubmit(pipeline_resources.queue, 1, &commands);
+
+    MapResult map_result = { .done = false, .success = false };
+
+    // Map the staging buffer to read back the results
+    MapResult result = {0};
+
+    WGPUBufferMapCallbackInfo callback_info = {
+        .mode = WGPUCallbackMode_AllowSpontaneous,
+        .callback = on_buffer_mapped,
+        .userdata1 = &result
+    };
+
+    wgpuBufferMapAsync(
+        staging_buffer,
+        WGPUMapMode_Read,
+        0,
+        buffer_size,
+        callback_info
+    );
+
+    // 4. Wait for mapping to complete
+    while (!result.done) {
+        wgpuDevicePoll(pipeline_resources.device, true, NULL);
+    }
+
+    if (!result.success) {
+        wgpuBufferRelease(staging_buffer);
+        wgpuCommandBufferRelease(commands);
+       return false; // Mapping failed
+    }
+
+    // Read the data from the mapped staging buffer and update the original image
+    const Pixel* data = (const Pixel*)
+    wgpuBufferGetConstMappedRange(
+        staging_buffer,
+        0,
+        buffer_size
+    );
+
+    if (data != NULL) {
+        for (int i = 0; i < buffer_size / sizeof(Pixel); i++) {
+            int row = i / replaceIn->width;
+            int col = i % replaceIn->width;
+            replaceIn->imageData[row][col] = data[i];
+        }
+    }
+    // TODO - Else error
+
+    // TODO - Move the
+    wgpuBufferRelease(staging_buffer);
+    wgpuCommandBufferRelease(commands);
 
     return true;
 }

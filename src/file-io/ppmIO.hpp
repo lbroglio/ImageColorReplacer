@@ -28,6 +28,7 @@ class Pixel{
          * 
          */
         std::uint32_t b;
+        std::uint32_t padding; // Padding to align to 16 bytes
 };
 
 

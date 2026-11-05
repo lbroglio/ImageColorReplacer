@@ -66,7 +66,7 @@ WGPUQueue init_queue(WGPUDevice device);
  * 
  * @return WGPUShaderModule The created WebGPU shader module or NULL if creation failed.
  */
-WGPUShaderModule init_shader_module(WGPUDevice device, const char* shader_code, std::string shader_name);
+WGPUShaderModule init_shader_module(WGPUDevice device, std::string_view shader_code, std::string_view shader_name);
 
 /**
  * @brief Initializes a WebGPU compute pipeline with default settings.
@@ -78,8 +78,8 @@ WGPUShaderModule init_shader_module(WGPUDevice device, const char* shader_code, 
  *
  * @return WGPUComputePipeline  The created WebGPU compute pipeline or NULL if creation failed.
  */
-WGPUComputePipeline init_compute_pipeline(WGPUDevice device, WGPUShaderModule shader_module, std::string entry_point,
-    std::string pipeline_label);
+WGPUComputePipeline init_compute_pipeline(WGPUDevice device, WGPUShaderModule shader_module, std::string_view entry_point,
+    std::string_view pipeline_label);
 
 /**
  * @brief Initializes a WebGPU command encoder with default settings.
@@ -98,3 +98,57 @@ WGPUCommandEncoder init_command_encoder(WGPUDevice device);
  * @return WGPUComputePassEncoder The created WebGPU compute pass encoder or NULL if creation failed.
  */
 WGPUComputePassEncoder init_compute_pass_encoder(WGPUCommandEncoder encoder);
+
+/**
+ * @brief Initializes a WebGPU uniform buffer with default settings.
+ * 
+ * @param device The WebGPU device to use.
+ * @param size The size of the buffer in bytes.
+ * @param buffer_label The label of the buffer.
+ * @return WGPUBuffer The created WebGPU buffer or NULL if creation failed.
+ */
+WGPUBuffer init_uniform_buffer(WGPUDevice device, uint64_t size, std::string buffer_label);
+
+/**
+ * @brief Initializes a WebGPU storage buffer with default settings.
+ *
+ * @param device The WebGPU device to use.
+ * @param size The size of the buffer in bytes.
+ * @param buffer_label The label of the buffer.
+ * @return WGPUBuffer The created WebGPU buffer or NULL if creation failed.
+ */
+WGPUBuffer init_storage_buffer(WGPUDevice device, uint64_t size, std::string buffer_label);
+
+/**
+ * @brief Initializes a WebGPU bind group entry with default settings.
+ *
+ * @param binding The binding index.
+ * @param buffer The WebGPU buffer to use.
+ * @param offset The offset within the buffer.
+ * @param size The size of the entry.
+ * @return WGPUBindGroupEntry The created WebGPU bind group entry or NULL if creation failed.
+ */
+WGPUBindGroupEntry init_bind_group_entry(uint32_t binding, WGPUBuffer buffer, uint64_t offset, uint64_t size);
+
+/**
+ * @brief Initializes a WebGPU bind group layout with default settings.
+ *
+ * @param pipeline The WebGPU compute pipeline to use.
+ * @param bind_group_layout_label The label of the bind group layout.
+ *
+ * @return WGPUBindGroupLayout The created WebGPU bind group layout or NULL if creation failed.
+ */
+WGPUBindGroupLayout init_bind_group_layout(WGPUComputePipeline pipeline, std::string bind_group_layout_label);
+
+/**
+ * @brief Initializes a WebGPU bind group with default settings.
+ * 
+ * @param device The WebGPU device to use.
+ * @param bind_group_layout The WebGPU bind group layout to use.
+ * @param entries The entries for the bind group.
+ * @param entry_count The number of entries in the bind group.
+ * @param bind_group_label The label of the bind group.
+ * @return WGPUBindGroup The created WebGPU bind group or NULL if creation failed.
+ */
+WGPUBindGroup init_bind_group(WGPUDevice device, WGPUBindGroupLayout bind_group_layout, WGPUBindGroupEntry* entries, size_t entry_count, std::string bind_group_label);
+

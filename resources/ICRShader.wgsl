@@ -7,6 +7,7 @@ struct Color {
     r: u32,
     g: u32,
     b: u32,
+    padding: u32, // Padding to align to 16 bytes
 };
 
 @group(0) @binding(0) var<uniform> image_details: ImageDetails;
@@ -23,7 +24,7 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
 
     let index = (id.y * image_details.width) + id.x;
 
-    Color pixel = image[index];
+    var pixel = image[index];
 
     // TODO - Does this need a tolerance for color matching?
     // Check if the pixel color matches the target color

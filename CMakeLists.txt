@@ -20,7 +20,8 @@ add_executable(ImageColorReplacer
     src/main/imageColorReplace.cpp
     src/file-io/ppmIO.cpp
     src/terminal-io/errors.cpp
-    src/utils/graphicsUtils.cpp
+    src/graphics/graphicsUtils.cpp
+    src/graphics/graphics.cpp
 )
 target_compile_features(ImageColorReplacer PRIVATE cxx_std_20)
 target_include_directories(ImageColorReplacer PRIVATE

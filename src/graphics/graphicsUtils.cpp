@@ -14,6 +14,13 @@ struct DeviceRequestContext {
     void* userdata;
 };
 
+WGPUStringView to_wgpu_string(std::string_view value) {
+    return {
+        .data = value.data(),
+        .length = value.size()
+    };
+}
+
 static void on_adapter_request(WGPURequestAdapterStatus status, WGPUAdapter adapter, WGPUStringView message, void* userdata1, void* userdata2) {
     auto* context = static_cast<AdapterRequestContext*>(userdata1);
 
@@ -84,18 +91,19 @@ WGPUQueue init_queue(WGPUDevice device) {
 }
 
 
-WGPUShaderModule init_shader_module(WGPUDevice device, const char* shader_code, std::string shader_name) {
+
+WGPUShaderModule init_shader_module(WGPUDevice device, std::string_view shader_code, std::string_view shader_name) {
    WGPUShaderSourceWGSL shader_source = {
         .chain = {
             .next = NULL,
             .sType = WGPUSType_ShaderSourceWGSL 
         },
-        .code = shader_code
+        .code = to_wgpu_string(shader_code)
     };
 
    WGPUShaderModuleDescriptor shader_desc = {
         .nextInChain = &shader_source.chain,
-        .label = shader_name.c_str() 
+        .label = to_wgpu_string(shader_name)
     };
 
     WGPUShaderModule shader_module = wgpuDeviceCreateShaderModule(
@@ -111,15 +119,16 @@ WGPUShaderModule init_shader_module(WGPUDevice device, const char* shader_code, 
 }
 
 
-WGPUComputePipeline init_compute_pipeline(WGPUDevice device, WGPUShaderModule shader_module, std::string entry_point,
-    std::string pipeline_label) {
+
+WGPUComputePipeline init_compute_pipeline(WGPUDevice device, WGPUShaderModule shader_module, std::string_view entry_point,
+    std::string_view pipeline_label) {
     WGPUComputePipelineDescriptor pipeline_desc = {
         .nextInChain = NULL,
-        .label = pipeline_label.c_str(),
+        .label = to_wgpu_string(pipeline_label),
         .layout = NULL,
         .compute = {
             .module = shader_module,
-            .entryPoint = entry_point.c_str()
+            .entryPoint = to_wgpu_string(entry_point),
         }
     };
 
@@ -160,4 +169,103 @@ WGPUComputePassEncoder init_compute_pass_encoder(WGPUCommandEncoder encoder) {
     }
 
     return pass_encoder;
+}
+
+
+
+
+WGPUBuffer init_uniform_buffer(WGPUDevice device, uint64_t size, std::string buffer_label) {
+    WGPUBufferDescriptor buffer_desc = {
+        .nextInChain = NULL,
+        .label = buffer_label.c_str(),
+        .usage = WGPUBufferUsage_Uniform | WGPUBufferUsage_CopyDst,
+        .size = size,
+        .mappedAtCreation = true
+    };
+
+    WGPUBuffer buffer = wgpuDeviceCreateBuffer(device, &buffer_desc);
+
+    if (!buffer) {
+        return NULL;
+    }
+
+    return buffer;
+}
+
+WGPUBuffer init_storage_buffer(WGPUDevice device, uint64_t size, std::string buffer_label) {
+    WGPUBufferDescriptor buffer_desc = {
+        .nextInChain = NULL,
+        .label = buffer_label.c_str(),
+        .usage = WGPUBufferUsage_Storage | WGPUBufferUsage_CopyDst | WGPUBufferUsage_CopySrc,
+        .size = size,
+        .mappedAtCreation = true
+    };
+
+    WGPUBuffer buffer = wgpuDeviceCreateBuffer(device, &buffer_desc);
+
+    if (!buffer) {
+        return NULL;
+    }
+
+    return buffer;
+}
+
+WGPUBindGroupEntry init_bind_group_entry(uint32_t binding, WGPUBuffer buffer, uint64_t offset, uint64_t size) {
+    WGPUBindGroupEntry entry = {
+        .nextInChain = NULL,
+        .binding = binding,
+        .buffer = buffer,
+        .offset = offset,
+        .size = size,
+    };
+
+    return entry;
+}
+
+WGPUBindGroupLayout init_bind_group_layout(WGPUComputePipeline pipeline, std::string bind_group_layout_label) {
+    WGPUBindGroupLayout bind_group_layout = wgpuComputePipelineGetBindGroupLayout(pipeline, 0);
+
+    if (!bind_group_layout) {
+        return NULL;
+    }
+
+    return bind_group_layout;
+
+}
+
+
+WGPUBindGroup init_bind_group(WGPUDevice device, WGPUBindGroupLayout bind_group_layout, WGPUBindGroupEntry* entries, size_t entry_count, std::string bind_group_label) {
+    WGPUBindGroupDescriptor bind_group_desc = {
+        .nextInChain = NULL,
+        .label = bind_group_label.c_str(),
+        .layout = bind_group_layout,
+        .entryCount = entry_count,
+        .entries = entries
+    };
+
+    WGPUBindGroup bind_group = wgpuDeviceCreateBindGroup(device, &bind_group_desc);
+
+    if (!bind_group) {
+        return NULL;
+    }
+
+    return bind_group;
+}
+
+WGPUBuffer init_staging_buffer(WGPUDevice device, uint64_t size, std::string buffer_label) {
+    WGPUBufferDescriptor buffer_desc = {
+        .nextInChain = NULL,
+        .label = buffer_label.c_str(),
+        .usage = WGPUBufferUsage_MapRead | WGPUBufferUsage_CopyDst,
+        .size = size,
+        .mappedAtCreation = true
+    };
+
+    WGPUBuffer buffer = wgpuDeviceCreateBuffer(device, &buffer_desc);
+
+    if (!buffer) {
+        return NULL;
+    }
+
+    return buffer;
 }
