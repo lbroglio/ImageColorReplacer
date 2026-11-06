@@ -7,13 +7,23 @@ struct Color {
     r: u32,
     g: u32,
     b: u32,
-    padding: u32, // Padding to align to 16 bytes
+    padding: u32, // Padding to align to 16 bytes``
 };
 
 @group(0) @binding(0) var<uniform> image_details: ImageDetails;
 @group(0) @binding(1) var<uniform> target_color: Color;
 @group(0) @binding(2) var<uniform> new_color: Color;
 @group(0) @binding(3) var<storage, read_write> image: array<Color>;
+@group(0) @binding(4) var<uniform> distance_threshold: u32;
+
+fn color_distance(c1: Color, c2: Color) -> u32 {
+    let weighted_r_dist = pow(f32(c1.r - c2.r), 2) * 0.299;
+    let weighted_g_dist = pow(f32(c1.g - c2.g), 2) * 0.587;
+    let weighted_b_dist = pow(f32(c1.b - c2.b), 2) * 0.114;
+    let distance = sqrt(weighted_r_dist + weighted_g_dist + weighted_b_dist);
+
+    return u32(distance);
+}
 
 @compute @workgroup_size(8, 8, 1)
 fn main(@builtin(global_invocation_id) id: vec3<u32>) {
@@ -28,7 +38,7 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
 
     // TODO - Does this need a tolerance for color matching?
     // Check if the pixel color matches the target color
-    if (pixel.r == target_color.r && pixel.g == target_color.g && pixel.b == target_color.b) {
+    if (color_distance(pixel, target_color) < distance_threshold) {
         // Replace the pixel color with the new color
         image[index] = new_color;
     }

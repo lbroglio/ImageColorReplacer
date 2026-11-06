@@ -66,7 +66,7 @@ static void on_gpu_work_done(WGPUQueueWorkDoneStatus status, WGPUStringView mess
  * @return true The operation was successful
  * @return false The operation failed for some reason (related to the GPU)
  */
-bool replaceColor(PPMImage* replaceIn, Pixel colorToChange, Pixel newColor, float distForChange){
+bool replaceColor(PPMImage* replaceIn, Pixel colorToChange, Pixel newColor, float change_distance_threshold){
     // TODO - Maybe switch to reading this in as a 1D array instead of a 2D array to avoid flattening it here
     // Flatten the 2D image data into a 1D array for GPU processing
     std::vector<Pixel> flatImageData;
@@ -82,6 +82,7 @@ bool replaceColor(PPMImage* replaceIn, Pixel colorToChange, Pixel newColor, floa
     };
     info.target_color = colorToChange;
     info.new_color = newColor;
+    info.distance_threshold = static_cast<uint32_t>(change_distance_threshold);
     info.image = std::span(flatImageData);
     info.shader_code = std::string_view(shader_code, sizeof(shader_code));
 
@@ -248,7 +249,7 @@ int main(int argc, char* argv[]){
     // Change any pixels within the the given dist of change color to new color using the GPU
     // TODO -- Alert User on error
     // TODO -- Don't hard code the distance
-    replaceColor(&toProc, changeColor, newColor, 1);
+    replaceColor(&toProc, changeColor, newColor, 30);
 
     // Output to a new PPM
     std::ofstream outFile("swapppepColors.ppm");

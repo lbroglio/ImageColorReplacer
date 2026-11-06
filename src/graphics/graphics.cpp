@@ -74,6 +74,9 @@ ColorReplacePipelineResources::~ColorReplacePipelineResources() {
     if (instance) {
         wgpuInstanceRelease(instance);
     }
+    if (distance_threshold_buffer) {
+        wgpuBufferRelease(distance_threshold_buffer);
+    }
 }
 
 bool ColorReplacePipelineResources::create(const ColorReplaceCreateInfo& info) {
@@ -140,16 +143,24 @@ bool ColorReplacePipelineResources::create(const ColorReplaceCreateInfo& info) {
     std::memcpy(mappedMemory, info.image.data(), image_buffer_size);
     wgpuBufferUnmap(this->image_buffer);
 
+
+    this->distance_threshold_buffer = 
+        init_uniform_buffer(this->device, sizeof(std::uint32_t), "DistanceThresholdBuffer");
+    mappedMemory = wgpuBufferGetMappedRange(this->distance_threshold_buffer, 0, sizeof(std::uint32_t));
+    std::memcpy(mappedMemory, &info.distance_threshold, sizeof(std::uint32_t));
+    wgpuBufferUnmap(this->distance_threshold_buffer);
+
     // Setup the bind group entries
-    WGPUBindGroupEntry entries[4] = {
+    WGPUBindGroupEntry entries[5] = {
         init_bind_group_entry(0, this->image_details_buffer, 0, sizeof(ImageDetails)),
         init_bind_group_entry(1, this->target_color_buffer, 0, sizeof(Pixel)),
         init_bind_group_entry(2, this->new_color_buffer, 0, sizeof(Pixel)),
-        init_bind_group_entry(3, this->image_buffer, 0, image_buffer_size)
+        init_bind_group_entry(3, this->image_buffer, 0, image_buffer_size),
+        init_bind_group_entry(4, this->distance_threshold_buffer, 0, sizeof(std::uint32_t))
     };
 
     this->bind_group = init_bind_group(
-        this->device, this->bind_group_layout, entries, 4, "ColorReplaceBindGroup");
+        this->device, this->bind_group_layout, entries, 5, "ColorReplaceBindGroup");
 
     // If any item in the above initialization failed, return false
     if (!this->bind_group) {

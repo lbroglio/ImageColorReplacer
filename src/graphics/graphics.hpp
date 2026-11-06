@@ -23,6 +23,7 @@ struct ColorReplaceCreateInfo {
     ImageDetails image_details;
     Pixel target_color;
     Pixel new_color;
+    std::uint32_t distance_threshold;
     std::span<const Pixel> image;
 };
 
@@ -41,11 +42,12 @@ struct ColorReplacePipelineResources {
     WGPUBuffer target_color_buffer;
     WGPUBuffer new_color_buffer;
     WGPUBuffer image_buffer;
+    WGPUBuffer distance_threshold_buffer;
 
     ColorReplacePipelineResources() : instance(nullptr), adapter(nullptr), device(nullptr), queue(nullptr), shader_module(nullptr),
                           pipeline(nullptr), encoder(nullptr), pass_encoder(nullptr), bind_group_layout(nullptr),
                           bind_group(nullptr), image_details_buffer(nullptr), target_color_buffer(nullptr),
-                          new_color_buffer(nullptr), image_buffer(nullptr) {}
+                          new_color_buffer(nullptr), image_buffer(nullptr), distance_threshold_buffer(nullptr) {}
 
     ~ColorReplacePipelineResources();
 
