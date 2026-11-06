@@ -258,7 +258,7 @@ WGPUBuffer init_staging_buffer(WGPUDevice device, uint64_t size, std::string buf
         .label = buffer_label.c_str(),
         .usage = WGPUBufferUsage_MapRead | WGPUBufferUsage_CopyDst,
         .size = size,
-        .mappedAtCreation = true
+        .mappedAtCreation = false
     };
 
     WGPUBuffer buffer = wgpuDeviceCreateBuffer(device, &buffer_desc);

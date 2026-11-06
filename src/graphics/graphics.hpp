@@ -21,7 +21,7 @@ struct ImageDetails {
 struct ColorReplaceCreateInfo {
     std::string_view shader_code;
     ImageDetails image_details;
-    Pixel replace_color;
+    Pixel target_color;
     Pixel new_color;
     std::span<const Pixel> image;
 };
@@ -38,13 +38,13 @@ struct ColorReplacePipelineResources {
     WGPUBindGroupLayout bind_group_layout;
     WGPUBindGroup bind_group;
     WGPUBuffer image_details_buffer;
-    WGPUBuffer replace_color_buffer;
+    WGPUBuffer target_color_buffer;
     WGPUBuffer new_color_buffer;
     WGPUBuffer image_buffer;
 
     ColorReplacePipelineResources() : instance(nullptr), adapter(nullptr), device(nullptr), queue(nullptr), shader_module(nullptr),
                           pipeline(nullptr), encoder(nullptr), pass_encoder(nullptr), bind_group_layout(nullptr),
-                          bind_group(nullptr), image_details_buffer(nullptr), replace_color_buffer(nullptr),
+                          bind_group(nullptr), image_details_buffer(nullptr), target_color_buffer(nullptr),
                           new_color_buffer(nullptr), image_buffer(nullptr) {}
 
     ~ColorReplacePipelineResources();

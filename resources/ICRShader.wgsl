@@ -11,8 +11,8 @@ struct Color {
 };
 
 @group(0) @binding(0) var<uniform> image_details: ImageDetails;
-@group(0) @binding(1) var<uniform> replace_color: Color;
-@group(0) @binding(2) var<uniform> target_color: Color;
+@group(0) @binding(1) var<uniform> target_color: Color;
+@group(0) @binding(2) var<uniform> new_color: Color;
 @group(0) @binding(3) var<storage, read_write> image: array<Color>;
 
 @compute @workgroup_size(8, 8, 1)
@@ -30,6 +30,6 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     // Check if the pixel color matches the target color
     if (pixel.r == target_color.r && pixel.g == target_color.g && pixel.b == target_color.b) {
         // Replace the pixel color with the new color
-        image[index] = replace_color;
+        image[index] = new_color;
     }
 }

@@ -80,7 +80,7 @@ bool replaceColor(PPMImage* replaceIn, Pixel colorToChange, Pixel newColor, floa
         .length = static_cast<uint32_t>(replaceIn->length),
         .width = static_cast<uint32_t>(replaceIn->width)
     };
-    info.replace_color = colorToChange;
+    info.target_color = colorToChange;
     info.new_color = newColor;
     info.image = std::span(flatImageData);
     info.shader_code = std::string_view(shader_code, sizeof(shader_code));
@@ -97,15 +97,6 @@ bool replaceColor(PPMImage* replaceIn, Pixel colorToChange, Pixel newColor, floa
         .label = "Buffer Copy Encoder"
     };
 
-    // TODO - Ensure this is freed after use
-    WGPUCommandBuffer commandBuffer =
-        wgpuCommandEncoderFinish(
-            pipeline_resources.encoder,
-            &encoder_desc
-        );
-
-    wgpuQueueSubmit(pipeline_resources.queue, 1, &commandBuffer);
-    
     // Setup callback 
     bool done = false;
     WGPUQueueWorkDoneCallbackInfo callbackInfo = {
@@ -124,8 +115,9 @@ bool replaceColor(PPMImage* replaceIn, Pixel colorToChange, Pixel newColor, floa
         // TODO - Add timeout to avoid infinite loop
     }
 
+
     // TODO - Ensure this is freed after use
-    WGPUBuffer staging_buffer = init_storage_buffer(
+    WGPUBuffer staging_buffer = init_staging_buffer(
         pipeline_resources.device,
         sizeof(Pixel) * replaceIn->length * replaceIn->width,
         "StagingBuffer"
@@ -167,7 +159,7 @@ bool replaceColor(PPMImage* replaceIn, Pixel colorToChange, Pixel newColor, floa
         callback_info
     );
 
-    // 4. Wait for mapping to complete
+    // Wait for mapping to complete
     while (!result.done) {
         wgpuDevicePoll(pipeline_resources.device, true, NULL);
     }
@@ -190,6 +182,7 @@ bool replaceColor(PPMImage* replaceIn, Pixel colorToChange, Pixel newColor, floa
         for (int i = 0; i < buffer_size / sizeof(Pixel); i++) {
             int row = i / replaceIn->width;
             int col = i % replaceIn->width;
+            //std::cout << data[i].r << ", " << data[i].g << ", " << data[i].b << std::endl;
             replaceIn->imageData[row][col] = data[i];
         }
     }
@@ -215,24 +208,24 @@ int main(int argc, char* argv[]){
     // TODO - Add distance arg
 
     // Parse color args 
-    const char* changeColorNums[3];
-    const char* newColorNums[3];
+    std::string changeColorNums[3];
+    std::string newColorNums[3];
 
     //TODO - Break out into functions in terminal-io
     int firstComma = changeColorStr.find_first_of(',');
     int secondComma =  changeColorStr.find_last_of(',');
-    changeColorNums[0] = changeColorStr.substr(0, firstComma).c_str();
-    changeColorNums[1] = changeColorStr.substr(firstComma + 1, secondComma - (firstComma + 1)).c_str();
-    changeColorNums[2] = changeColorStr.substr(secondComma + 1).c_str();
+    changeColorNums[0] = changeColorStr.substr(0, firstComma);
+    changeColorNums[1] = changeColorStr.substr(firstComma + 1, secondComma - (firstComma + 1));
+    changeColorNums[2] = changeColorStr.substr(secondComma + 1);
 
     // TODO Remove after dev is done
     std::cout << "Color to change: " << changeColorNums[0] << ", " << changeColorNums[1] << ", " << changeColorNums[2] << std::endl;
 
     firstComma = newColorStr.find_first_of(',');
     secondComma =  newColorStr.find_last_of(',');
-    newColorNums[0] = newColorStr.substr(0, firstComma).c_str();
-    newColorNums[1] = newColorStr.substr(firstComma + 1, secondComma - (firstComma + 1)).c_str();
-    newColorNums[2] = newColorStr.substr(secondComma + 1).c_str();
+    newColorNums[0] = newColorStr.substr(0, firstComma);
+    newColorNums[1] = newColorStr.substr(firstComma + 1, secondComma - (firstComma + 1));
+    newColorNums[2] = newColorStr.substr(secondComma + 1);
 
     // TODO Remove after dev is done
     std::cout << "New Color " << newColorNums[0] << ", " << newColorNums[1] << ", " << newColorNums[2] << std::endl;
@@ -240,14 +233,14 @@ int main(int argc, char* argv[]){
 
     // Initialize those colors as pixel objects
     Pixel changeColor;
-    changeColor.r = atoi(changeColorNums[0]);
-    changeColor.g = atoi(changeColorNums[1]);
-    changeColor.b = atoi(changeColorNums[2]);
+    changeColor.r = atoi(changeColorNums[0].c_str());
+    changeColor.g = atoi(changeColorNums[1].c_str());
+    changeColor.b = atoi(changeColorNums[2].c_str());
 
     Pixel newColor;
-    newColor.r = atoi(newColorNums[0]);
-    newColor.g = atoi(newColorNums[1]);
-    newColor.b = atoi(newColorNums[2]);
+    newColor.r = atoi(newColorNums[0].c_str());
+    newColor.g = atoi(newColorNums[1].c_str());
+    newColor.b = atoi(newColorNums[2].c_str());
 
     // Read in image
     PPMImage toProc = readInPPM(filePath);

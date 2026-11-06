@@ -132,9 +132,11 @@ void PPMOut(std::ofstream* file, std::vector<std::vector<Pixel>> outputFrom, int
     *file << imgLength  << ' ' << imgWidth << '\n';
     *file << "255\n";
 
+    std::cout << "Outputting image of size: " << imgLength << " x " << imgWidth << std::endl;
     //Output the data
-    for(int i = 0; i < imgWidth; i++){
-        for(int j = 0; j < imgLength; j++){
+    for(int i = 0; i < imgLength; i++){
+        for(int j = 0; j < imgWidth; j++){
+            //std::cout << outputFrom[i][j].r << ", " << outputFrom[i][j].g << ", " << outputFrom[i][j].b << std::endl;
             file->put(outputFrom[i][j].r);
             file->put(outputFrom[i][j].g);
             file->put(outputFrom[i][j].b);

@@ -35,11 +35,11 @@ ColorReplacePipelineResources::~ColorReplacePipelineResources() {
     if (image_buffer) {
         wgpuBufferRelease(image_buffer);
     }
+    if (target_color_buffer) {
+        wgpuBufferRelease(target_color_buffer);
+    }
     if (new_color_buffer) {
         wgpuBufferRelease(new_color_buffer);
-    }
-    if (replace_color_buffer) {
-        wgpuBufferRelease(replace_color_buffer);
     }
     if (image_details_buffer) {
         wgpuBufferRelease(image_details_buffer);
@@ -78,92 +78,95 @@ ColorReplacePipelineResources::~ColorReplacePipelineResources() {
 
 bool ColorReplacePipelineResources::create(const ColorReplaceCreateInfo& info) {
     // Initialize WebGPU objects
-    WGPUInstance instance = init_instance();
-    if (!instance) {
+    this->instance = init_instance();
+    if (!this->instance) {
         return false;
     }
 
     AdapterRequestState adapter_state;
-    request_adapter(instance, on_adapter_ready, &adapter_state);
+    request_adapter(this->instance, on_adapter_ready, &adapter_state);
     while (!adapter_state.complete) {
-        wgpuInstanceProcessEvents(instance);
+        wgpuInstanceProcessEvents(this->instance);
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
 
-    WGPUAdapter adapter = adapter_state.adapter;
-    if (!adapter) {
+    this->adapter = adapter_state.adapter;
+    if (!this->adapter) {
         return false;
     }
 
     DeviceRequestState device_state;
-    request_device(adapter, on_device_ready, &device_state);
+    request_device(this->adapter, on_device_ready, &device_state);
     while (!device_state.complete) {
-        wgpuInstanceProcessEvents(instance);
+        wgpuInstanceProcessEvents(this->instance);
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
 
-    WGPUDevice device = device_state.device;
-    if (!device) {
+    this->device = device_state.device;
+    if (!this->device) {
         return false;
     }
-    WGPUQueue queue = init_queue(device);
-    WGPUShaderModule shader_module = init_shader_module(device, info.shader_code, "ColorReplaceShader");
-    WGPUComputePipeline pipeline = init_compute_pipeline(device, shader_module, "main", "ColorReplacePipeline");
-    WGPUCommandEncoder encoder = init_command_encoder(device);
-    WGPUComputePassEncoder pass_encoder = init_compute_pass_encoder(encoder);
-    WGPUBindGroupLayout bind_group_layout = init_bind_group_layout(pipeline, "ColorReplaceBindGroupLayout");
+    this->queue = init_queue(this->device);
+    this->shader_module = init_shader_module(this->device, info.shader_code, "ColorReplaceShader");
+    this->pipeline = init_compute_pipeline(this->device, this->shader_module, "main", "ColorReplacePipeline");
+    this->encoder = init_command_encoder(this->device);
+    this->pass_encoder = init_compute_pass_encoder(this->encoder);
+    this->bind_group_layout = init_bind_group_layout(this->pipeline, "ColorReplaceBindGroupLayout");
     
     // Setup the image details buffer
-
-    // Setup the buffers the shader needs
-    WGPUBuffer image_details_buffer = 
-        init_uniform_buffer(device, sizeof(ImageDetails), "ImageDetailsBuffer");
-    void* mappedMemory = wgpuBufferGetMappedRange(image_details_buffer, 0, sizeof(ImageDetails));
+    this->image_details_buffer = 
+        init_uniform_buffer(this->device, sizeof(ImageDetails), "ImageDetailsBuffer");
+    void* mappedMemory = wgpuBufferGetMappedRange(this->image_details_buffer, 0, sizeof(ImageDetails));
     std::memcpy(mappedMemory, &info.image_details, sizeof(ImageDetails));
-    wgpuBufferUnmap(image_details_buffer);
+    wgpuBufferUnmap(this->image_details_buffer);
 
 
-    WGPUBuffer replace_color_buffer = 
-        init_uniform_buffer(device, sizeof(Pixel), "ColorToChangeBuffer");
-    mappedMemory = wgpuBufferGetMappedRange(replace_color_buffer, 0, sizeof(Pixel));
-    std::memcpy(mappedMemory, &info.replace_color, sizeof(Pixel));
-    wgpuBufferUnmap(replace_color_buffer);
+
+    this->target_color_buffer = 
+        init_uniform_buffer(this->device, sizeof(Pixel), "TargetColorBuffer");
+    mappedMemory = wgpuBufferGetMappedRange(this->target_color_buffer, 0, sizeof(Pixel));
+    std::memcpy(mappedMemory, &info.target_color, sizeof(Pixel));
+    wgpuBufferUnmap(this->target_color_buffer);
     
-    WGPUBuffer new_color_buffer = 
-        init_uniform_buffer(device, sizeof(Pixel), "NewColorBuffer");
-    mappedMemory = wgpuBufferGetMappedRange(new_color_buffer, 0, sizeof(Pixel));
+    this->new_color_buffer = 
+        init_uniform_buffer(this->device, sizeof(Pixel), "NewColorBuffer");
+    mappedMemory = wgpuBufferGetMappedRange(this->new_color_buffer, 0, sizeof(Pixel));
     std::memcpy(mappedMemory, &info.new_color, sizeof(Pixel));
-    wgpuBufferUnmap(new_color_buffer);
+    wgpuBufferUnmap(this->new_color_buffer);
     
     size_t image_buffer_size = sizeof(Pixel) * info.image_details.length * info.image_details.width;
-    WGPUBuffer image_buffer = init_storage_buffer(device, image_buffer_size, "ImageBuffer");
-    mappedMemory = wgpuBufferGetMappedRange(image_buffer, 0, image_buffer_size);
+    this->image_buffer = init_storage_buffer(this->device, image_buffer_size, "ImageBuffer");
+    mappedMemory = wgpuBufferGetMappedRange(this->image_buffer, 0, image_buffer_size);
     std::memcpy(mappedMemory, info.image.data(), image_buffer_size);
-    wgpuBufferUnmap(image_buffer);
+    wgpuBufferUnmap(this->image_buffer);
 
     // Setup the bind group entries
     WGPUBindGroupEntry entries[4] = {
-        init_bind_group_entry(0, image_details_buffer, 0, sizeof(ImageDetails)),
-        init_bind_group_entry(1, replace_color_buffer, 0, sizeof(Pixel)),
-        init_bind_group_entry(2, new_color_buffer, 0, sizeof(Pixel)),
-        init_bind_group_entry(3, image_buffer, 0, image_buffer_size)
+        init_bind_group_entry(0, this->image_details_buffer, 0, sizeof(ImageDetails)),
+        init_bind_group_entry(1, this->target_color_buffer, 0, sizeof(Pixel)),
+        init_bind_group_entry(2, this->new_color_buffer, 0, sizeof(Pixel)),
+        init_bind_group_entry(3, this->image_buffer, 0, image_buffer_size)
     };
 
-    WGPUBindGroup bind_group = init_bind_group(device, bind_group_layout, entries, 4, "ColorReplaceBindGroup");
+    this->bind_group = init_bind_group(
+        this->device, this->bind_group_layout, entries, 4, "ColorReplaceBindGroup");
 
     // If any item in the above initialization failed, return false
+    if (!this->bind_group) {
+        return false;
+    }
 
     // Finish setup and dispatch the compute shader
-    wgpuComputePassEncoderSetPipeline(pass_encoder, pipeline);
-    wgpuComputePassEncoderSetBindGroup(pass_encoder, 0, bind_group, 0, NULL);
+    wgpuComputePassEncoderSetPipeline(this->pass_encoder, this->pipeline);
+    wgpuComputePassEncoderSetBindGroup(this->pass_encoder, 0, this->bind_group, 0, NULL);
 
     // Calculate the number of workgroups needed based on the image size
     uint32_t workgroupCountX = (info.image_details.length + 7) / 8; 
     uint32_t workgroupCountY = (info.image_details.width + 7) / 8; 
 
-    wgpuComputePassEncoderDispatchWorkgroups(pass_encoder, workgroupCountX, workgroupCountY, 1);
+    wgpuComputePassEncoderDispatchWorkgroups(this->pass_encoder, workgroupCountX, workgroupCountY, 1);
 
-    wgpuComputePassEncoderEnd(pass_encoder);
+    wgpuComputePassEncoderEnd(this->pass_encoder);
 
     return true;
 }

@@ -152,3 +152,13 @@ WGPUBindGroupLayout init_bind_group_layout(WGPUComputePipeline pipeline, std::st
  */
 WGPUBindGroup init_bind_group(WGPUDevice device, WGPUBindGroupLayout bind_group_layout, WGPUBindGroupEntry* entries, size_t entry_count, std::string bind_group_label);
 
+
+/**
+ * @brief Initializes a WebGPU staging buffer with default settings.
+ * 
+ * @param device The WebGPU device to use.
+ * @param size The size of the buffer in bytes.
+ * @param buffer_label The label of the buffer.
+ * @return WGPUBuffer The created WebGPU buffer or NULL if creation failed.
+ */
+WGPUBuffer init_staging_buffer(WGPUDevice device, uint64_t size, std::string buffer_label);
