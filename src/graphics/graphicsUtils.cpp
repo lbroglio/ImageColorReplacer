@@ -222,6 +222,17 @@ WGPUBindGroupEntry init_bind_group_entry(uint32_t binding, WGPUBuffer buffer, ui
     return entry;
 }
 
+WGPUBindGroupEntry init_bind_group_entry_for_texture(uint32_t binding, WGPUTextureView texture_view, uint64_t offset) {
+    WGPUBindGroupEntry entry = {
+        .nextInChain = NULL,
+        .binding = binding,
+        .offset = offset,
+        .textureView = texture_view
+    };
+
+    return entry;
+}
+
 WGPUBindGroupLayout init_bind_group_layout(WGPUComputePipeline pipeline, std::string bind_group_layout_label) {
     WGPUBindGroupLayout bind_group_layout = wgpuComputePipelineGetBindGroupLayout(pipeline, 0);
 
@@ -268,4 +279,49 @@ WGPUBuffer init_staging_buffer(WGPUDevice device, uint64_t size, std::string buf
     }
 
     return buffer;
+}
+
+
+WGPUTexture init_texture(WGPUDevice device, uint32_t width, uint32_t height, std::string texture_label) {
+    WGPUTextureDescriptor texture_desc = {
+        .nextInChain = NULL,
+        .label = texture_label.c_str(),
+        .usage = WGPUTextureUsage_CopyDst | WGPUTextureUsage_CopySrc | WGPUTextureUsage_TextureBinding,
+        .dimension = WGPUTextureDimension_2D,
+        .size = {width, height, 1},
+        .format = WGPUTextureFormat_RGBA8Unorm,
+        .mipLevelCount = 1,
+        .sampleCount = 1
+    };
+
+
+    WGPUTexture texture = wgpuDeviceCreateTexture(device, &texture_desc);
+
+    if (!texture) {
+        return NULL;
+    }
+
+    return texture;
+}
+
+
+WGPUTextureView init_texture_view(WGPUTexture texture, std::string texture_view_label){
+    WGPUTextureViewDescriptor texture_view_desc = {
+        .nextInChain = NULL,
+        .label = texture_view_label.c_str(),
+        .format = WGPUTextureFormat_RGBA8Unorm,
+        .dimension = WGPUTextureViewDimension_2D,
+        .baseMipLevel = 0,
+        .mipLevelCount = 1,
+        .baseArrayLayer = 0,
+        .arrayLayerCount = 1
+    };
+
+    WGPUTextureView texture_view = wgpuTextureCreateView(texture, &texture_view_desc);
+
+    if (!texture_view) {
+        return NULL;
+    }
+
+    return texture_view;
 }

@@ -6,8 +6,7 @@
 
 #include <wgpu.h>
 
-
-#include "../file-io/ppmIO.hpp"
+#include "../file-io/pngIO.hpp"
 #include "../terminal-io/errors.hpp"
 #include "../graphics/graphicsUtils.hpp"
 #include "../graphics/graphics.hpp"
@@ -16,7 +15,6 @@
 
 // Globals 
 
-// TODO Log for openGL errors
 
 // Embedded shader code
 const char shader_code[] = {
@@ -66,24 +64,19 @@ static void on_gpu_work_done(WGPUQueueWorkDoneStatus status, WGPUStringView mess
  * @return true The operation was successful
  * @return false The operation failed for some reason (related to the GPU)
  */
-bool replaceColor(PPMImage* replaceIn, Pixel colorToChange, Pixel newColor, float change_distance_threshold){
-    // TODO - Maybe switch to reading this in as a 1D array instead of a 2D array to avoid flattening it here
-    // Flatten the 2D image data into a 1D array for GPU processing
-    std::vector<Pixel> flatImageData;
-    for (const auto& row : replaceIn->imageData) {
-        flatImageData.insert(flatImageData.end(), row.begin(), row.end());
-    }
-    
-    
-    ColorReplaceCreateInfo info;
-    info.image_details = {
-        .length = static_cast<uint32_t>(replaceIn->length),
-        .width = static_cast<uint32_t>(replaceIn->width)
-    };
-    info.target_color = colorToChange;
-    info.new_color = newColor;
+bool replaceColor(ImageDetails* image_details, Pixel color_to_change, Pixel new_color, std::uint32_t change_distance_threshold){
+        
+    ColorReplaceCreateInfo info(
+        std::string_view(shader_code, sizeof(shader_code)),
+        *image_details,
+        color_to_change,
+        new_color,
+        change_distance_threshold
+    );
+    info.image_details = *image_details;
+    info.target_color = color_to_change;
+    info.new_color = new_color;
     info.distance_threshold = static_cast<uint32_t>(change_distance_threshold);
-    info.image = std::span(flatImageData);
     info.shader_code = std::string_view(shader_code, sizeof(shader_code));
 
     ColorReplacePipelineResources pipeline_resources;
@@ -117,24 +110,42 @@ bool replaceColor(PPMImage* replaceIn, Pixel colorToChange, Pixel newColor, floa
     }
 
 
-    // TODO - Ensure this is freed after use
     WGPUBuffer staging_buffer = init_staging_buffer(
         pipeline_resources.device,
-        sizeof(Pixel) * replaceIn->length * replaceIn->width,
+        4 * image_details->height * image_details->width,
         "StagingBuffer"
     );
 
-    size_t buffer_size = sizeof(Pixel) * replaceIn->length * replaceIn->width;
+    WGPUTexelCopyTextureInfo source_texture = {
+        .texture = pipeline_resources.new_image_texture,
+        .mipLevel = 0,
+        .origin = { 0, 0, 0 },
+        .aspect = WGPUTextureAspect_All
+    };
+
+    WGPUTexelCopyBufferInfo dest_buf = {
+        .layout = {
+            .offset = 0,
+            .bytesPerRow = 4 * image_details->width,
+            .rowsPerImage = image_details->height
+        },
+        .buffer = staging_buffer
+    };
+
+    WGPUExtent3D copy_size = {
+        .width = image_details->width,
+        .height = image_details->height,
+        .depthOrArrayLayers = 1
+    };
 
     // Copy the results from the GPU back to the staging buffer
-    wgpuCommandEncoderCopyBufferToBuffer(
+    wgpuCommandEncoderCopyTextureToBuffer(
         pipeline_resources.encoder,
-        pipeline_resources.image_buffer,
-        0,
-        staging_buffer,
-        0,
-        buffer_size
+        &source_texture,
+        &dest_buf,
+        &copy_size
     );
+
 
     // TODO - Ensure this is freed after use
     WGPUCommandBuffer commands = wgpuCommandEncoderFinish(pipeline_resources.encoder, NULL);
@@ -151,6 +162,8 @@ bool replaceColor(PPMImage* replaceIn, Pixel colorToChange, Pixel newColor, floa
         .callback = on_buffer_mapped,
         .userdata1 = &result
     };
+
+    std::uint64_t buffer_size = 4 * image_details->width * image_details->height;
 
     wgpuBufferMapAsync(
         staging_buffer,
@@ -172,22 +185,19 @@ bool replaceColor(PPMImage* replaceIn, Pixel colorToChange, Pixel newColor, floa
     }
 
     // Read the data from the mapped staging buffer and update the original image
-    const Pixel* data = (const Pixel*)
-    wgpuBufferGetConstMappedRange(
+    unsigned char* data = (unsigned char*) wgpuBufferGetConstMappedRange(
         staging_buffer,
         0,
         buffer_size
     );
 
-    if (data != NULL) {
-        for (int i = 0; i < buffer_size / sizeof(Pixel); i++) {
-            int row = i / replaceIn->width;
-            int col = i % replaceIn->width;
-            //std::cout << data[i].r << ", " << data[i].g << ", " << data[i].b << std::endl;
-            replaceIn->imageData[row][col] = data[i];
-        }
+    if (!data) {
+        wgpuBufferRelease(staging_buffer);
+        wgpuCommandBufferRelease(commands);
+        return false; // Failed to get mapped range
     }
-    // TODO - Else error
+
+    std::memcpy(image_details->image_data, data, buffer_size);
 
     // TODO - Move the
     wgpuBufferRelease(staging_buffer);
@@ -219,18 +229,11 @@ int main(int argc, char* argv[]){
     changeColorNums[1] = changeColorStr.substr(firstComma + 1, secondComma - (firstComma + 1));
     changeColorNums[2] = changeColorStr.substr(secondComma + 1);
 
-    // TODO Remove after dev is done
-    std::cout << "Color to change: " << changeColorNums[0] << ", " << changeColorNums[1] << ", " << changeColorNums[2] << std::endl;
-
     firstComma = newColorStr.find_first_of(',');
     secondComma =  newColorStr.find_last_of(',');
     newColorNums[0] = newColorStr.substr(0, firstComma);
     newColorNums[1] = newColorStr.substr(firstComma + 1, secondComma - (firstComma + 1));
     newColorNums[2] = newColorStr.substr(secondComma + 1);
-
-    // TODO Remove after dev is done
-    std::cout << "New Color " << newColorNums[0] << ", " << newColorNums[1] << ", " << newColorNums[2] << std::endl;
-
 
     // Initialize those colors as pixel objects
     Pixel changeColor;
@@ -244,17 +247,17 @@ int main(int argc, char* argv[]){
     newColor.b = atoi(newColorNums[2].c_str());
 
     // Read in image
-    PPMImage toProc = readInPPM(filePath);
+    ImageDetails* image_details = readin_png_image(filePath);
 
     // Change any pixels within the the given dist of change color to new color using the GPU
     // TODO -- Alert User on error
     // TODO -- Don't hard code the distance
-    replaceColor(&toProc, changeColor, newColor, 30);
+    replaceColor(image_details, changeColor, newColor, 30);
 
     // Output to a new PPM
-    std::ofstream outFile("swapppepColors.ppm");
-    PPMOut(&outFile, toProc.imageData, toProc.length, toProc.width);
+    int result = writeout_png_image("output.png", image_details);
 
-    outFile.close();
+    delete image_details;
 
+    // TODO - Terminal error handling for result
 }

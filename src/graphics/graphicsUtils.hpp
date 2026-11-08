@@ -131,6 +131,16 @@ WGPUBuffer init_storage_buffer(WGPUDevice device, uint64_t size, std::string buf
 WGPUBindGroupEntry init_bind_group_entry(uint32_t binding, WGPUBuffer buffer, uint64_t offset, uint64_t size);
 
 /**
+ * @brief Initialized a WebGPU bind group entry for a texture with default settings.
+ * 
+ * @param binding The binding index.
+ * @param texture_view The WebGPU texture view to use.
+ * @param offset The offset within the texture view.
+ * @return WGPUBindGroupEntry The created WebGPU bind group entry or NULL if creation failed.
+ */
+WGPUBindGroupEntry init_bind_group_entry_for_texture(uint32_t binding, WGPUTextureView texture_view, uint64_t offset);
+
+/**
  * @brief Initializes a WebGPU bind group layout with default settings.
  *
  * @param pipeline The WebGPU compute pipeline to use.
@@ -162,3 +172,24 @@ WGPUBindGroup init_bind_group(WGPUDevice device, WGPUBindGroupLayout bind_group_
  * @return WGPUBuffer The created WebGPU buffer or NULL if creation failed.
  */
 WGPUBuffer init_staging_buffer(WGPUDevice device, uint64_t size, std::string buffer_label);
+
+/**
+ * @brief Initializes a WebGPU texture for an image with default settings.
+ * 
+ * @param device The WebGPU device to use
+ * @param width The number of pixels in the image
+ * @param height The number of pixels in the image
+ * @param texture_label The label of the texture
+ * @param rgba_pixel_data The pixel data for the image
+ * @return WGPUTexture The created WebGPU texture or NULL if creation failed
+ */
+WGPUTexture init_texture(WGPUDevice device, uint32_t width, uint32_t height, std::string texture_label);
+
+/**
+ * @brief Initializes a WebGPU texture view for a given texture with default settings.
+ * 
+ * @param texture The WebGPU texture to create a view for.
+ * @param texture_view_label The label of the texture view.
+ * @return WGPUTextureView The created WebGPU texture view or NULL if creation failed.
+ */
+WGPUTextureView init_texture_view(WGPUTexture texture, std::string texture_view_label);
