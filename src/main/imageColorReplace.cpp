@@ -64,7 +64,7 @@ static void on_gpu_work_done(WGPUQueueWorkDoneStatus status, WGPUStringView mess
  * @return true The operation was successful
  * @return false The operation failed for some reason (related to the GPU)
  */
-bool replaceColor(ImageDetails* image_details, Pixel color_to_change, Pixel new_color, std::uint32_t change_distance_threshold){
+bool replaceColor(ImageDetails* image_details, Pixel color_to_change, Pixel new_color, std::float32_t change_distance_threshold){
         
     ColorReplaceCreateInfo info(
         std::string_view(shader_code, sizeof(shader_code)),
@@ -73,11 +73,6 @@ bool replaceColor(ImageDetails* image_details, Pixel color_to_change, Pixel new_
         new_color,
         change_distance_threshold
     );
-    info.image_details = *image_details;
-    info.target_color = color_to_change;
-    info.new_color = new_color;
-    info.distance_threshold = static_cast<uint32_t>(change_distance_threshold);
-    info.shader_code = std::string_view(shader_code, sizeof(shader_code));
 
     ColorReplacePipelineResources pipeline_resources;
     if (!pipeline_resources.create(info)) {
@@ -237,14 +232,16 @@ int main(int argc, char* argv[]){
 
     // Initialize those colors as pixel objects
     Pixel changeColor;
-    changeColor.r = atoi(changeColorNums[0].c_str());
-    changeColor.g = atoi(changeColorNums[1].c_str());
-    changeColor.b = atoi(changeColorNums[2].c_str());
+    changeColor.r = map_255_to_1(atoi(changeColorNums[0].c_str()));
+    changeColor.g = map_255_to_1(atoi(changeColorNums[1].c_str()));
+    changeColor.b = map_255_to_1(atoi(changeColorNums[2].c_str()));
+    changeColor.a = 1.0f; // Set alpha to fully opaque
 
     Pixel newColor;
-    newColor.r = atoi(newColorNums[0].c_str());
-    newColor.g = atoi(newColorNums[1].c_str());
-    newColor.b = atoi(newColorNums[2].c_str());
+    newColor.r = map_255_to_1(atoi(newColorNums[0].c_str()));
+    newColor.g = map_255_to_1(atoi(newColorNums[1].c_str()));
+    newColor.b = map_255_to_1(atoi(newColorNums[2].c_str()));
+    newColor.a = 1.0f; // Set alpha to fully opaque
 
     // Read in image
     ImageDetails* image_details = readin_png_image(filePath);
@@ -252,7 +249,7 @@ int main(int argc, char* argv[]){
     // Change any pixels within the the given dist of change color to new color using the GPU
     // TODO -- Alert User on error
     // TODO -- Don't hard code the distance
-    replaceColor(image_details, changeColor, newColor, 30);
+    replaceColor(image_details, changeColor, newColor, 0.05f);
 
     // Output to a new PPM
     int result = writeout_png_image("output.png", image_details);

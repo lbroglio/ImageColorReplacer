@@ -286,7 +286,8 @@ WGPUTexture init_texture(WGPUDevice device, uint32_t width, uint32_t height, std
     WGPUTextureDescriptor texture_desc = {
         .nextInChain = NULL,
         .label = texture_label.c_str(),
-        .usage = WGPUTextureUsage_CopyDst | WGPUTextureUsage_CopySrc | WGPUTextureUsage_TextureBinding,
+        .usage = WGPUTextureUsage_CopyDst | WGPUTextureUsage_CopySrc | WGPUTextureUsage_TextureBinding |
+            WGPUTextureUsage_StorageBinding,
         .dimension = WGPUTextureDimension_2D,
         .size = {width, height, 1},
         .format = WGPUTextureFormat_RGBA8Unorm,

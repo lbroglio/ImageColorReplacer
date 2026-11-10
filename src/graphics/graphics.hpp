@@ -40,12 +40,12 @@ struct alignas(16) Pixel{
 
 struct ColorReplaceCreateInfo {
     std::string_view shader_code;
-    ImageDetails image_details;
+    const ImageDetails& image_details;
     Pixel target_color;
     Pixel new_color;
-    std::uint32_t distance_threshold;
+    std::float32_t distance_threshold;
 
-    ColorReplaceCreateInfo(std::string_view shader_code, ImageDetails image_details, Pixel target_color, Pixel new_color, std::uint32_t distance_threshold)
+    ColorReplaceCreateInfo(std::string_view shader_code, const ImageDetails& image_details, Pixel target_color, Pixel new_color, std::float32_t distance_threshold)
         : shader_code(shader_code), image_details(image_details), target_color(target_color), new_color(new_color), distance_threshold(distance_threshold) {}
 };
 
@@ -81,3 +81,10 @@ struct ColorReplacePipelineResources {
 };
 
 
+/**
+ * @brief Maps a value from the range [0, 255] to the range [0, 1]
+ * 
+ * @param color_value The color value in the range [0, 255]
+ * @return std::float32_t The corresponding value in the range [0, 1]
+ */
+std::float32_t map_255_to_1(int color_value);

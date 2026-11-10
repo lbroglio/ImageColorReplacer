@@ -9,8 +9,10 @@ struct ImageDetails {
     std::uint32_t height;
     unsigned char* image_data;
 
-
     ImageDetails(unsigned char* data, std::uint32_t w, std::uint32_t h) : width(w), height(h), image_data(data) {}
+
+    ImageDetails(const ImageDetails&) = delete;
+    ImageDetails& operator=(const ImageDetails&) = delete;
 
     ~ImageDetails();
 };

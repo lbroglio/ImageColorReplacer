@@ -40,7 +40,7 @@ ColorReplacePipelineResources::~ColorReplacePipelineResources() {
     }
     if (input_image_texture) {
         wgpuTextureDestroy(input_image_texture);
-        wgpuTextureRelease(new_image_texture);
+        wgpuTextureRelease(input_image_texture);
     }
     if (new_image_texture) {
         wgpuTextureDestroy(new_image_texture);
@@ -134,8 +134,6 @@ bool ColorReplacePipelineResources::create(const ColorReplaceCreateInfo& info) {
     std::memcpy(mappedMemory, &info.image_details, sizeof(ImageDetails));
     wgpuBufferUnmap(this->image_details_buffer);
 
-
-
     this->target_color_buffer = 
         init_uniform_buffer(this->device, sizeof(Pixel), "TargetColorBuffer");
     mappedMemory = wgpuBufferGetMappedRange(this->target_color_buffer, 0, sizeof(Pixel));
@@ -148,9 +146,6 @@ bool ColorReplacePipelineResources::create(const ColorReplaceCreateInfo& info) {
     std::memcpy(mappedMemory, &info.new_color, sizeof(Pixel));
     wgpuBufferUnmap(this->new_color_buffer);
     
-
-    // TODO - Fix
-
     this->input_image_texture = init_texture(this->device, info.image_details.width, info.image_details.height, "InputImageTexture");
     this->input_image_texture_view = init_texture_view(this->input_image_texture, "InputImageTextureView");
     
@@ -178,13 +173,13 @@ bool ColorReplacePipelineResources::create(const ColorReplaceCreateInfo& info) {
 
     // Enqueue the copy command using the device queue
     size_t data_size = info.image_details.width * info.image_details.height * 4;
-    wgpuQueueWriteTexture(queue, &destination, &info.image_details.image_data, data_size, &data_layout, 
+    wgpuQueueWriteTexture(queue, &destination, info.image_details.image_data, data_size, &data_layout,
         &texture_extent);
 
     this->distance_threshold_buffer = 
-        init_uniform_buffer(this->device, sizeof(std::uint32_t), "DistanceThresholdBuffer");
-    mappedMemory = wgpuBufferGetMappedRange(this->distance_threshold_buffer, 0, sizeof(std::uint32_t));
-    std::memcpy(mappedMemory, &info.distance_threshold, sizeof(std::uint32_t));
+        init_uniform_buffer(this->device, sizeof(std::float32_t), "DistanceThresholdBuffer");
+    mappedMemory = wgpuBufferGetMappedRange(this->distance_threshold_buffer, 0, sizeof(std::float32_t));
+    std::memcpy(mappedMemory, &info.distance_threshold, sizeof(std::float32_t));
     wgpuBufferUnmap(this->distance_threshold_buffer);
 
     // Setup the bind group entries
@@ -194,7 +189,7 @@ bool ColorReplacePipelineResources::create(const ColorReplaceCreateInfo& info) {
         init_bind_group_entry(2, this->new_color_buffer, 0, sizeof(Pixel)),
         init_bind_group_entry_for_texture(3, this->input_image_texture_view, 0),
         init_bind_group_entry_for_texture(4, this->new_image_texture_view, 0),
-        init_bind_group_entry(5, this->distance_threshold_buffer, 0, sizeof(std::uint32_t))
+        init_bind_group_entry(5, this->distance_threshold_buffer, 0, sizeof(std::float32_t))
     };
 
     this->bind_group = init_bind_group(
@@ -218,4 +213,12 @@ bool ColorReplacePipelineResources::create(const ColorReplaceCreateInfo& info) {
     wgpuComputePassEncoderEnd(this->pass_encoder);
 
     return true;
+}
+
+
+std::float32_t map_255_to_1(int color_value){
+    float color_value_float = static_cast<float>(color_value);
+    float normalized = std::clamp(color_value_float / 255.0f, 0.0f, 1.0f);
+
+    return normalized;
 }
