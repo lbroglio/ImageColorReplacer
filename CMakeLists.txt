@@ -60,6 +60,7 @@ add_executable(ImageColorReplacer
     src/terminal-io/errors.cpp
     src/graphics/graphicsUtils.cpp
     src/graphics/graphics.cpp
+    src/terminal-io/input.cpp
 )
 target_compile_features(ImageColorReplacer PRIVATE cxx_std_20)
 target_include_directories(ImageColorReplacer PRIVATE

@@ -10,6 +10,7 @@
 #include "../terminal-io/errors.hpp"
 #include "../graphics/graphicsUtils.hpp"
 #include "../graphics/graphics.hpp"
+#include "../terminal-io/input.hpp"
 
 
 
@@ -26,7 +27,6 @@ struct MapResult {
     bool success;
 };
 
-// TODO - Maybe move this elsewhere
 static void on_buffer_mapped(
     WGPUMapAsyncStatus status,
     WGPUStringView message,
@@ -64,7 +64,8 @@ static void on_gpu_work_done(WGPUQueueWorkDoneStatus status, WGPUStringView mess
  * @return true The operation was successful
  * @return false The operation failed for some reason (related to the GPU)
  */
-bool replaceColor(ImageDetails* image_details, Pixel color_to_change, Pixel new_color, std::float32_t change_distance_threshold){
+bool replaceColor(ImageDetails* image_details, Pixel color_to_change, Pixel new_color, std::float32_t change_distance_threshold,
+    std::string* error_message = nullptr) {
         
     ColorReplaceCreateInfo info(
         std::string_view(shader_code, sizeof(shader_code)),
@@ -76,15 +77,10 @@ bool replaceColor(ImageDetails* image_details, Pixel color_to_change, Pixel new_
 
     ColorReplacePipelineResources pipeline_resources;
     if (!pipeline_resources.create(info)) {
+        *error_message = "Failed to create pipeline resources.";
         return false;
     }
 
-
-
-    WGPUCommandBufferDescriptor encoder_desc = {
-        .nextInChain = NULL,
-        .label = "Buffer Copy Encoder"
-    };
 
     // Setup callback 
     bool done = false;
@@ -97,11 +93,16 @@ bool replaceColor(ImageDetails* image_details, Pixel color_to_change, Pixel new_
 
     wgpuQueueOnSubmittedWorkDone(pipeline_resources.queue, callbackInfo);
 
+    int wait_iterations = 0;
     while (!done) {
         wgpuInstanceProcessEvents(pipeline_resources.instance);
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
-        // TODO - Add timeout to avoid infinite loop
+        wait_iterations++;
+        if (wait_iterations > 10000) {
+            *error_message = "Timeout waiting for GPU work to complete.";
+            return false;
+        }
     }
 
 
@@ -142,12 +143,9 @@ bool replaceColor(ImageDetails* image_details, Pixel color_to_change, Pixel new_
     );
 
 
-    // TODO - Ensure this is freed after use
     WGPUCommandBuffer commands = wgpuCommandEncoderFinish(pipeline_resources.encoder, NULL);
 
     wgpuQueueSubmit(pipeline_resources.queue, 1, &commands);
-
-    MapResult map_result = { .done = false, .success = false };
 
     // Map the staging buffer to read back the results
     MapResult result = {0};
@@ -176,7 +174,8 @@ bool replaceColor(ImageDetails* image_details, Pixel color_to_change, Pixel new_
     if (!result.success) {
         wgpuBufferRelease(staging_buffer);
         wgpuCommandBufferRelease(commands);
-       return false; // Mapping failed
+        *error_message = "Failed to map buffer.";
+        return false; // Mapping failed
     }
 
     // Read the data from the mapped staging buffer and update the original image
@@ -189,12 +188,12 @@ bool replaceColor(ImageDetails* image_details, Pixel color_to_change, Pixel new_
     if (!data) {
         wgpuBufferRelease(staging_buffer);
         wgpuCommandBufferRelease(commands);
+        *error_message = "Failed to get mapped range from staging buffer.";
         return false; // Failed to get mapped range
     }
 
     std::memcpy(image_details->image_data, data, buffer_size);
 
-    // TODO - Move the
     wgpuBufferRelease(staging_buffer);
     wgpuCommandBufferRelease(commands);
 
@@ -204,57 +203,57 @@ bool replaceColor(ImageDetails* image_details, Pixel color_to_change, Pixel new_
 int main(int argc, char* argv[]){
     // TODO -- Add usage with -h
 
-    // TODO -- Add error handling for args
+    std::vector<std::string> args(argv + 1, argv + argc);
+
     // Parse arguments
-    // TODO -- IO with PNGs converted to/or from PPMs
-    std::string filePath = argv[1];
-    std::string changeColorStr = argv[2];
-    std::string newColorStr = argv[3];
+    std::string filePath = args[0];
+    std::string changeColorStr = args[1];
+    std::string newColorStr = args[2];
 
-    // TODO - Add distance arg
+    float distance_threshold = 0.05f;
 
-    // Parse color args 
-    std::string changeColorNums[3];
-    std::string newColorNums[3];
+    std::string distance_threshold_str = extract_argument_value(&args, "-d");
+    if (!distance_threshold_str.empty()) {
+        try {
+            distance_threshold = std::stof(distance_threshold_str);
+        } catch (const std::invalid_argument& e) {
+            fatal_error("Invalid distance threshold value: " + distance_threshold_str);
+        }
+    }
 
-    //TODO - Break out into functions in terminal-io
-    int firstComma = changeColorStr.find_first_of(',');
-    int secondComma =  changeColorStr.find_last_of(',');
-    changeColorNums[0] = changeColorStr.substr(0, firstComma);
-    changeColorNums[1] = changeColorStr.substr(firstComma + 1, secondComma - (firstComma + 1));
-    changeColorNums[2] = changeColorStr.substr(secondComma + 1);
 
-    firstComma = newColorStr.find_first_of(',');
-    secondComma =  newColorStr.find_last_of(',');
-    newColorNums[0] = newColorStr.substr(0, firstComma);
-    newColorNums[1] = newColorStr.substr(firstComma + 1, secondComma - (firstComma + 1));
-    newColorNums[2] = newColorStr.substr(secondComma + 1);
+    Pixel change_color;
+    try{
+        change_color = parse_color_string(changeColorStr);
+    }
+    catch (const std::invalid_argument& e) {
+        fatal_error(e.what());
+    }
 
-    // Initialize those colors as pixel objects
-    Pixel changeColor;
-    changeColor.r = map_255_to_1(atoi(changeColorNums[0].c_str()));
-    changeColor.g = map_255_to_1(atoi(changeColorNums[1].c_str()));
-    changeColor.b = map_255_to_1(atoi(changeColorNums[2].c_str()));
-    changeColor.a = 1.0f; // Set alpha to fully opaque
-
-    Pixel newColor;
-    newColor.r = map_255_to_1(atoi(newColorNums[0].c_str()));
-    newColor.g = map_255_to_1(atoi(newColorNums[1].c_str()));
-    newColor.b = map_255_to_1(atoi(newColorNums[2].c_str()));
-    newColor.a = 1.0f; // Set alpha to fully opaque
+    Pixel new_color;
+    try{
+        new_color = parse_color_string(newColorStr);
+    }
+    catch (const std::invalid_argument& e) {
+        fatal_error(e.what());
+    }
 
     // Read in image
     ImageDetails* image_details = readin_png_image(filePath);
 
     // Change any pixels within the the given dist of change color to new color using the GPU
-    // TODO -- Alert User on error
-    // TODO -- Don't hard code the distance
-    replaceColor(image_details, changeColor, newColor, 0.05f);
+    std::string error_message;
+    bool success = replaceColor(image_details, change_color, new_color, distance_threshold, &error_message);
+    if (!success) {
+        fatal_error(error_message);
+    }
 
     // Output to a new PPM
     int result = writeout_png_image("output.png", image_details);
 
     delete image_details;
 
-    // TODO - Terminal error handling for result
+    if (result != 1) {
+        fatal_error("Failed to write output image.");
+    }
 }
