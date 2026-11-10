@@ -50,8 +50,9 @@ std::string extract_argument_value(std::vector<std::string>* argv, const std::st
         throw std::invalid_argument("No value provided for argument: " + argument_name);
     }
 
+    std::string value = argv->at(arg_pos + 1);
     // Remove the argument and its value from the vector
     argv->erase(argv->begin() + arg_pos, argv->begin() + arg_pos + 2);
 
-    return std::string(argv->at(arg_pos + 1));
+    return value;
 }

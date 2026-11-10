@@ -3,6 +3,7 @@
 #include <thread>
 #include <chrono>
 #include <cstring>
+#include <algorithm>
 
 #include <wgpu.h>
 
@@ -201,9 +202,19 @@ bool replaceColor(ImageDetails* image_details, Pixel color_to_change, Pixel new_
 }
 
 int main(int argc, char* argv[]){
-    // TODO -- Add usage with -h
+    
+
 
     std::vector<std::string> args(argv + 1, argv + argc);
+
+    if (std::ranges::contains(args,  std::string{"-h"})) {
+        std::cout << "Usage: imageColorReplace <image_path> <color_to_change> <new_color> [-d <distance_threshold>]\n"
+                  "  <image_path>: Path to the input PNG image.\n"
+                  "  <color_to_change>: Color to change in the format R,G,B (e.g., 255,0,0 for red).\n"
+                  "  <new_color>: New color to replace with in the format R,G,B (e.g., 0,255,0 for green).\n"
+                  "  -d <distance_threshold>: Optional. Distance threshold for color replacement (default is 0.05).\n";
+        return 0;
+    }
 
     // Parse arguments
     std::string filePath = args[0];
